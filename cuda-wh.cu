@@ -24,6 +24,8 @@ __device__ State state_add(const State &s1, const State &s2)
 
     s.pr = s1.pr + s2.pr;
     s.ptheta = s1.ptheta + s2.ptheta;
+    s.b = s1.b + s2.b;
+    s.Bsq = s1.Bsq + s2.Bsq;
     return s;
 }
 
@@ -35,6 +37,8 @@ __device__ State state_mul(double g, const State &s)
     rs.phi = g*s.phi;
     rs.pr = g*s.pr;
     rs.ptheta = g*s.ptheta;
+    rs.b = g*s.b;
+    rs.Bsq = g*s.Bsq;
     return rs;
 }
 
@@ -46,7 +50,7 @@ __device__ double l(double r)
 
 __device__ double dldr(double r)
 {
-    return r / l(r);
+    return r/l(r) ;
 }
 
 __device__ State rhs(const State &s, double gamma)
@@ -58,8 +62,11 @@ __device__ State rhs(const State &s, double gamma)
     ds.r = s.pr;
     ds.theta = s.ptheta / rsq;
     ds.phi = s.b / (rsq*pow(sin(s.theta), 2));
-    ds.pr = s.Bsq*(dldr(s.r) / (rsq*l(s.r)));
+    ds.pr = s.Bsq*(dldr(s.r) / (pow(l(s.r), 3)));
     ds.ptheta = (pow(s.b, 2)/rsq) * cos(s.theta)/pow(sin(s.theta), 3);
+    ds.b = 0.0;
+    ds.Bsq = 0.0;
+
     return ds;
 }
 
@@ -119,7 +126,7 @@ int main(void)
     double nx, ny, nz;
 
     double cam_l = -10.0;
-    double cam_r = cam_l;
+    double cam_r = sqrt(1.0 + pow(cam_l, 2));
     double cam_phi = 0.0;
     double cam_theta = pi/2;
 
@@ -144,7 +151,8 @@ int main(void)
     }
         int ind = 256*Nx + 256;
         cout << states_host[ind].r << " " << states_host[ind].theta << " " <<
-             states_host[ind].phi << " " << states_host[ind].b << endl;
+             states_host[ind].phi << " " << " " << states_host[ind].pr << " " 
+             << states_host[ind].b << endl;
     // Copy initial conditions to device
     err = cudaMemcpy(states_device, &states_host[0], N*sizeof(State), cudaMemcpyHostToDevice);
     if (err != cudaSuccess)
@@ -159,7 +167,7 @@ int main(void)
     // Integrate
     double dt = 1e-3;
     double t = 0.0;
-    double tend = 10.0;
+    double tend = 100.0;
     int k = 0;
     while(t < tend)
     {
@@ -179,7 +187,7 @@ int main(void)
             {
                 cout << "UPDATE   " <<  states_host[256*Nx + 256].r << " "
                     << states_host[ind].theta << " " << states_host[ind].phi 
-                    << " " << states_host[ind].b << endl;
+                    << " " << states_host[ind].pr << " " << states_host[ind].b << endl;
             }
         }
     }
