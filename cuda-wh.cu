@@ -42,12 +42,13 @@ __device__ State state_mul(float g, const State &s)
 
 __device__ float l(float r)
 {
-	return r;
+	float rhosq = 1.0;
+	return sqrt(rho + pow(r, 2));
 }
 
 __device__ float dldr(float r)
 {
-	return 1.0;
+	return r / l(r);
 }
 
 __device__ State rhs(const State &s, float gamma)
@@ -178,11 +179,18 @@ int main(void)
 
 			for (int j=0; j< 1; j++)
 			{
-				cout << "UPDATE   " <<  states_host[0].r << endl;
+				cout << "UPDATE   " <<  states_host[256*Nx + 256].r << endl;
 			}
 		}
-
 	}
+	// Retrieve results
+	err = cudaMemcpy(states_host, states_device, N*sizeof(State), cudaMemcpyDeviceToHost);
+	if (err != cudaSuccess)
+	{
+		cout << "Retrieval error" << endl;
+	}
+
+
 
 
 }
