@@ -1,6 +1,7 @@
 #include <iostream>
 #include <math.h>
 #include <fstream>
+#include <cstdlib>
 
 using namespace std;
 
@@ -15,7 +16,7 @@ typedef struct {
 } State;        // Dynamical System State Vector
 
 
-__device__ State state_add(const State &s1, const State &s2)
+State state_add(const State &s1, const State &s2)
 {
     State s;
     s.r = s1.r + s2.r;
@@ -29,7 +30,7 @@ __device__ State state_add(const State &s1, const State &s2)
     return s;
 }
 
-__device__ State state_mul(double g, const State &s)
+State state_mul(double g, const State &s)
 {
     State rs;
     rs.r = g*s.r;
@@ -42,18 +43,18 @@ __device__ State state_mul(double g, const State &s)
     return rs;
 }
 
-__device__ double l(double r)
+double l(double r)
 {
     double rhosq = 0.01;
     return sqrt(rhosq + pow(r, 2));
 }
 
-__device__ double dldr(double r)
+double dldr(double r)
 {
     return r/l(r) ;
 }
 
-__device__ State rhs(const State &s, double gamma)
+State rhs(const State &s, double gamma)
 {
 
     State ds;
@@ -70,12 +71,15 @@ __device__ State rhs(const State &s, double gamma)
     return ds;
 }
 
-__global__ void rk4_step(int N, State *states, double gamma, double h)
+void rk4_step(int N, State *states, double gamma, double h, int indx)
 {
-    uint indx = blockIdx.x*blockDim.x + threadIdx.x;
 
     State s = states[indx];
     State y = s;
+
+    if(s.pr < 0) {
+        int a = 1;
+    }
 
     State k1 = rhs(s, gamma);
     s = state_add(y, state_mul(h/2, k1));
@@ -92,19 +96,14 @@ __global__ void rk4_step(int N, State *states, double gamma, double h)
 int main(void)
 {
 
-    int Nx = 512;
-    int Ny = 512;  // Pixes
+    int Nx = 8;
+    int Ny = 8;  // Pixes
 
     int N = Nx*Ny;  // total pixels in image.
 
     // Allocate Host array for initial conditions:
     State *states_host = (State *)malloc(N*sizeof(State));
-    State temps[16];
-
-    // Allocate Device array for initial conditions
-    State *states_device;
-    cudaError_t err = cudaMalloc((void**) &states_device, N*sizeof(State));
-    if (err != cudaSuccess)
+    if (states_host == NULL)
     {
         cout << "Allocation error" << endl;
     }
@@ -149,22 +148,11 @@ int main(void)
             states_host[i*Nx +j].Bsq = pow(cam_r, 2)*(pow(nz,2) + pow(ny,2));
         }
     }
-    int ind = 256*Nx + 256;
-    ind = 0;
-    cout << states_host[ind].r << " " << states_host[ind].theta << " " 
-         << states_host[ind].phi << " " << " " << states_host[ind].pr << " " 
-         << states_host[ind].b << endl;
-
-
-    // Copy initial conditions to device
-    err = cudaMemcpy(states_device, &states_host[0], N*sizeof(State), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess)
-    {
-        cout << "Allocation error" << endl;
-    }
-
-    int blockSize = Nx;
-    int numBlocks = N / blockSize;
+        int ind = 4*Nx + 4;
+        ind =0;
+        cout << states_host[ind].r << " " << states_host[ind].theta << " " <<
+             states_host[ind].phi << " " << " " << states_host[ind].pr << " " 
+             << states_host[ind].b << endl;
 
     // Integrate
     double dt = 1e-3;
@@ -173,38 +161,21 @@ int main(void)
     int k = 0;
     while(t < tend)
     {
-        rk4_step<<<blockSize, numBlocks>>>(N, states_device, 1.0, dt);
+        for (int m = 0; m < N; m++){
+            rk4_step(N, states_host, 1.0, dt, m);
+        }
+        
         t += dt;
-        k += 1;
+        k +=1;
 
-        if((k%1000) == 0)
+        int ind = 4*Nx+4;
+        ind =0;
+        for (int j=0; j< 1; j++)
         {
-            cout << "Time: " << k*dt << endl;
-            // err = cudaMemcpy(states_host, states_device, N*sizeof(State), cudaMemcpyDeviceToHost);
-            // if (err != cudaSuccess)
-            // {
-            //     cout << "Allocation error" << endl;
-            // }
-
-            // for (int j=0; j< 1; j++)
-            // {
-            //     cout << "UPDATE   " <<  states_host[ind].r << " "
-            //         << states_host[ind].theta << " " << states_host[ind].phi 
-            //         << " " << states_host[ind].pr << " " << states_host[ind].b << endl;
-            // }
+            cout << "UPDATE   " <<  states_host[ind].r << " "
+                << states_host[ind].theta << " " << states_host[ind].phi 
+                << " " << states_host[ind].pr << " " << states_host[ind].b << endl;
         }
     }
-    // Retrieve results
-    err = cudaMemcpy(states_host, states_device, N*sizeof(State), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess)
-    {
-        cout << "Retrieval error" << endl;
-    }
-
-    ofstream outfile("mapout.dat", ios::binary);
-    outfile.write((char *)states_host, N*sizeof(State));
-    outfile.close();
-
-    cudaFree(states_device);
 
 }
