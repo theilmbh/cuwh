@@ -31,7 +31,7 @@ __device__ State state_add(const State &s1, const State &s2)
 __device__ State state_mul(float g, const State &s)
 {
 	State rs;
-	rs.r = g*s.theta;
+	rs.r = g*s.r;
 	rs.theta = g*s.theta;
 	rs.phi = g*s.phi;
 	rs.pr = g*s.pr;
@@ -43,7 +43,7 @@ __device__ State state_mul(float g, const State &s)
 __device__ float l(float r)
 {
 	float rhosq = 1.0;
-	return sqrt(rho + pow(r, 2));
+	return sqrt(rhosq + pow(r, 2));
 }
 
 __device__ float dldr(float r)
@@ -146,7 +146,9 @@ int main(void)
 			states_host[i*Nx +j].Bsq = pow(cam_r, 2)*(pow(nz,2) + pow(ny,2));
 		}
 	}
-
+        int ind = 256*Nx + 256;
+        cout << states_host[ind].r << " " << states_host[ind].theta << " " <<
+             states_host[ind].phi << " " << states_host[ind].pphi << endl;
 	// Copy initial conditions to device
 	err = cudaMemcpy(states_device, &states_host[0], N*sizeof(State), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess)
@@ -176,10 +178,12 @@ int main(void)
 			{
 				cout << "Allocation error" << endl;
 			}
-
+                        int ind = 256*Nx+256;
 			for (int j=0; j< 1; j++)
 			{
-				cout << "UPDATE   " <<  states_host[256*Nx + 256].r << endl;
+				cout << "UPDATE   " <<  states_host[256*Nx + 256].r << " "
+                                    << states_host[ind].theta << " " << states_host[ind].phi 
+                                    << " " << states_host[ind].b << endl;
 			}
 		}
 	}
