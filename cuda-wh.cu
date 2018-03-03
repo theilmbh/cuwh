@@ -58,8 +58,8 @@ __device__ State rhs(const State &s, float gamma)
 
 	ds.r = s.pr;
 	ds.theta = s.ptheta / rsq;
-	ds.phi = s.b / (rsq*pow(sin(s.theta), 2);
-	ds.pr = Bsq*(dldr(s.r) / (rsq*l(s.r)));
+	ds.phi = s.b / (rsq*pow(sin(s.theta), 2));
+	ds.pr = s.Bsq*(dldr(s.r) / (rsq*l(s.r)));
 	ds.ptheta = (pow(s.b, 2)/rsq) * cos(s.theta)/pow(sin(s.theta), 3);
 	ds.pphi = 0.0;
 	return ds;
@@ -109,8 +109,8 @@ int main(void)
 	float pi = 3.14159;
 	float deg2rad = pi/180;
 
-	thetaFOV = 20;
-	phiFOV = 20;
+	float thetaFOV = 20;
+	float phiFOV = 20;
 
 	float mintheta = pi/2 - deg2rad*thetaFOV/2;
 	float maxtheta = pi/2 + deg2rad*thetaFOV/2;
@@ -119,7 +119,6 @@ int main(void)
 
 	float thetacs, phics;
 	float nx, ny, nz;
-	float pl, ptheta, pphi
 
 	float cam_l = -10.0;
 	float cam_r = l(cam_l);
