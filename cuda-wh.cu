@@ -121,7 +121,7 @@ int main(void)
 	float nx, ny, nz;
 
 	float cam_l = -10.0;
-	float cam_r = l(cam_l);
+	float cam_r = cam_l;
 	float cam_phi = 0.0;
 	float cam_theta = pi/2;
 
