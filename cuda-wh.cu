@@ -1,17 +1,17 @@
 #include <iostream>
 #include <math.h>
+#include <fstream>
 
 using namespace std;
 
 typedef struct {
-	float r;
-	float theta;
-	float phi;
-	float pr;
-	float ptheta;
-	float pphi;
-	float b;
-	float Bsq;
+	double r;
+	double theta;
+	double phi;
+	double pr;
+	double ptheta;
+	double b;
+	double Bsq;
 } State;        // Dynamical System State Vector
 
 
@@ -24,11 +24,10 @@ __device__ State state_add(const State &s1, const State &s2)
 
 	s.pr = s1.pr + s2.pr;
 	s.ptheta = s1.ptheta + s2.ptheta;
-	s.pphi = s1.pphi + s2.pphi;
 	return s;
 }
 
-__device__ State state_mul(float g, const State &s)
+__device__ State state_mul(double g, const State &s)
 {
 	State rs;
 	rs.r = g*s.r;
@@ -36,37 +35,35 @@ __device__ State state_mul(float g, const State &s)
 	rs.phi = g*s.phi;
 	rs.pr = g*s.pr;
 	rs.ptheta = g*s.ptheta;
-	rs.pphi = g*s.pphi;
 	return rs;
 }
 
-__device__ float l(float r)
+__device__ double l(double r)
 {
-	float rhosq = 1.0;
+	double rhosq = 1.0;
 	return sqrt(rhosq + pow(r, 2));
 }
 
-__device__ float dldr(float r)
+__device__ double dldr(double r)
 {
 	return r / l(r);
 }
 
-__device__ State rhs(const State &s, float gamma)
+__device__ State rhs(const State &s, double gamma)
 {
 
 	State ds;
-	float rsq = pow(l(s.r), 2);
+	double rsq = pow(l(s.r), 2);
 
 	ds.r = s.pr;
 	ds.theta = s.ptheta / rsq;
 	ds.phi = s.b / (rsq*pow(sin(s.theta), 2));
 	ds.pr = s.Bsq*(dldr(s.r) / (rsq*l(s.r)));
 	ds.ptheta = (pow(s.b, 2)/rsq) * cos(s.theta)/pow(sin(s.theta), 3);
-	ds.pphi = 0.0;
 	return ds;
 }
 
-__global__ void rk4_step(int N, State *states, float gamma, float h)
+__global__ void rk4_step(int N, State *states, double gamma, double h)
 {
 	uint indx = blockIdx.x*blockDim.x + threadIdx.x;
 
@@ -107,31 +104,31 @@ int main(void)
 
 	// Setup Initial conditions
 	int i,j;
-	float pi = 3.14159;
-	float deg2rad = pi/180;
+	double pi = 3.14159;
+	double deg2rad = pi/180;
 
-	float thetaFOV = 20;
-	float phiFOV = 20;
+	double thetaFOV = 20;
+	double phiFOV = 20;
 
-	float mintheta = pi/2 - deg2rad*thetaFOV/2;
-	float maxtheta = pi/2 + deg2rad*thetaFOV/2;
-	float minphi = -deg2rad*phiFOV/2;
-	float maxphi = deg2rad*phiFOV/2;
+	double mintheta = pi/2 - deg2rad*thetaFOV/2;
+	double maxtheta = pi/2 + deg2rad*thetaFOV/2;
+	double minphi = -deg2rad*phiFOV/2;
+	double maxphi = deg2rad*phiFOV/2;
 
-	float thetacs, phics;
-	float nx, ny, nz;
+	double thetacs, phics;
+	double nx, ny, nz;
 
-	float cam_l = -10.0;
-	float cam_r = cam_l;
-	float cam_phi = 0.0;
-	float cam_theta = pi/2;
+	double cam_l = -10.0;
+	double cam_r = cam_l;
+	double cam_phi = 0.0;
+	double cam_theta = pi/2;
 
 	for(i=0; i<Nx; i++)  // phi
 	{
 		for(j=0; j<Ny; j++) // theta
 		{
-			thetacs = mintheta + (((float) j)/Ny)*(maxtheta - mintheta);
-			phics = minphi + (((float) i)/Nx)*(maxphi - minphi);
+			thetacs = mintheta + (((double) j)/Ny)*(maxtheta - mintheta);
+			phics = minphi + (((double) i)/Nx)*(maxphi - minphi);
 			nx = sin(thetacs)*cos(phics);
 			ny = sin(thetacs)*sin(phics);
 			nz = -1.0*cos(thetacs);
@@ -141,14 +138,13 @@ int main(void)
 			states_host[i*Nx +j].phi = cam_phi;
 			states_host[i*Nx +j].pr = nx;
 			states_host[i*Nx +j].ptheta = cam_r*nz;
-			states_host[i*Nx +j].pphi = cam_r*sin(cam_theta)*ny;
 			states_host[i*Nx +j].b = cam_r*sin(cam_theta)*ny;
 			states_host[i*Nx +j].Bsq = pow(cam_r, 2)*(pow(nz,2) + pow(ny,2));
 		}
 	}
         int ind = 256*Nx + 256;
         cout << states_host[ind].r << " " << states_host[ind].theta << " " <<
-             states_host[ind].phi << " " << states_host[ind].pphi << endl;
+             states_host[ind].phi << " " << states_host[ind].b << endl;
 	// Copy initial conditions to device
 	err = cudaMemcpy(states_device, &states_host[0], N*sizeof(State), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess)
@@ -161,9 +157,9 @@ int main(void)
 	int numBlocks = N / blockSize;
 
 	// Integrate
-	float dt = 1e-3;
-	float t = 0.0;
-	float tend = 100.0;
+	double dt = 1e-3;
+	double t = 0.0;
+	double tend = 10.0;
 	int k = 0;
 	while(t < tend)
 	{
@@ -194,7 +190,9 @@ int main(void)
 		cout << "Retrieval error" << endl;
 	}
 
-
+        ofstream outfile("mapout.dat", ios::binary);
+        outfile.write((char *)states_host, N*sizeof(State));
+        outfile.close();
 
 
 }
