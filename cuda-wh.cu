@@ -170,7 +170,7 @@ int main(void)
 
 		if((k%1000) == 0)
 		{
-			err = cudaMemcpy(&temps[0], states_device, 16*sizeof(State), cudaMemcpyDeviceToHost);
+			err = cudaMemcpy(states_host, states_device, N*sizeof(State), cudaMemcpyDeviceToHost);
 			if (err != cudaSuccess)
 			{
 				cout << "Allocation error" << endl;
@@ -178,7 +178,7 @@ int main(void)
 
 			for (int j=0; j< 1; j++)
 			{
-				cout << "UPDATE   " <<  temps[3].r << endl;
+				cout << "UPDATE   " <<  states_host[0].r << endl;
 			}
 		}
 
