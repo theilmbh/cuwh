@@ -4,32 +4,64 @@
 using namespace std;
 
 typedef struct {
-	float x;
-	float y;
+	float r;
+	float theta;
+	float phi;
+	float pr;
+	float ptheta;
+	float pphi;
+	float b;
+	float Bsq;
 } State;        // Dynamical System State Vector
 
 
 __device__ State state_add(const State &s1, const State &s2)
 {
 	State s;
-	s.x = s1.x + s2.x;
-	s.y = s1.y + s2.y;
+	s.r = s1.r + s2.r;
+	s.theta = s1.theta + s2.theta;
+	s.phi = s1.phi + s2.phi;
+
+	s.pr = s1.pr + s2.pr;
+	s.ptheta = s1.ptheta + s2.ptheta;
+	s.pphi = s1.pphi + s2.pphi;
 	return s;
 }
 
 __device__ State state_mul(float g, const State &s)
 {
 	State rs;
-	rs.x = g*s.x;
-	rs.y = g*s.y;
+	rs.r = g*s.theta;
+	rs.theta = g*s.theta;
+	rs.phi = g*s.phi;
+	rs.pr = g*s.pr;
+	rs.ptheta = g*s.ptheta;
+	rs.pphi = g*s.pphi;
 	return rs;
+}
+
+__device__ float l(float r)
+{
+	return r;
+}
+
+__device__ float dldr(float r)
+{
+	return 1.0;
 }
 
 __device__ State rhs(const State &s, float gamma)
 {
+
 	State ds;
-	ds.x = s.y;
-	ds.y = -gamma*s.x;
+	float rsq = pow(l(s.r), 2);
+
+	ds.r = s.pr;
+	ds.theta = s.ptheta / rsq;
+	ds.phi = s.b / (rsq*pow(sin(s.theta), 2);
+	ds.pr = Bsq*(dldr(s.r) / (rsq*l(s.r)));
+	ds.ptheta = (pow(s.b, 2)/rsq) * cos(s.theta)/pow(sin(s.theta), 3);
+	ds.pphi = 0.0;
 	return ds;
 }
 
@@ -74,14 +106,44 @@ int main(void)
 
 	// Setup Initial conditions
 	int i,j;
-	for(i=0; i<Nx; i++)
-	{
-		for(j=0; j<Ny; j++)
-		{
-			states_host[i*Nx +j].x = ((float) i)/Nx;
-			states_host[i*Nx+j].y = ((float) j)/Ny;
-			//cout << states_host[i*Nx +j].x << endl;
+	float pi = 3.14159;
+	float deg2rad = pi/180;
 
+	thetaFOV = 20;
+	phiFOV = 20;
+
+	float mintheta = pi/2 - deg2rad*thetaFOV/2;
+	float maxtheta = pi/2 + deg2rad*thetaFOV/2;
+	float minphi = -deg2rad*phiFOV/2;
+	float maxphi = deg2rad*phiFOV/2;
+
+	float thetacs, phics;
+	float nx, ny, nz;
+	float pl, ptheta, pphi
+
+	float cam_l = -10.0;
+	float cam_r = l(cam_l);
+	float cam_phi = 0.0;
+	float cam_theta = pi/2;
+
+	for(i=0; i<Nx; i++)  // phi
+	{
+		for(j=0; j<Ny; j++) // theta
+		{
+			thetacs = mintheta + (((float) j)/Ny)*(maxtheta - mintheta);
+			phics = minphi + (((float) i)/Nx)*(maxphi - minphi);
+			nx = sin(thetacs)*cos(phics);
+			ny = sin(thetacs)*sin(phics);
+			nz = -1.0*cos(thetacs);
+
+			states_host[i*Nx +j].r = cam_l;
+			states_host[i*Nx +j].theta = cam_theta;
+			states_host[i*Nx +j].phi = cam_phi;
+			states_host[i*Nx +j].pr = nx;
+			states_host[i*Nx +j].ptheta = cam_r*nz;
+			states_host[i*Nx +j].pphi = cam_r*sin(cam_theta)*ny;
+			states_host[i*Nx +j].b = cam_r*sin(cam_theta)*ny;
+			states_host[i*Nx +j].Bsq = pow(cam_r, 2)*(pow(nz,2) + pow(ny,2));
 		}
 	}
 
@@ -117,7 +179,7 @@ int main(void)
 
 			for (int j=0; j< 1; j++)
 			{
-				cout << "UPDATE   " <<  temps[3].x << endl;
+				cout << "UPDATE   " <<  temps[3].r << endl;
 			}
 		}
 
