@@ -37,32 +37,44 @@ __device__ double l(double r, double rhosq)
     return sqrt(rhosq + pow(r, 2));
 }
 
-// __device__ double l(double r, double a, double rho, double M)
-// {
-//     if (abs(r) < a) {
-//         return rho;
-//     }
+__device__ double l_dneg(double r, double a, double rho, double M)
+{
+    if (abs(r) < a) {
+        return rho;
+    }
 
-//     double x = (2*(abs(r) - a)) / (pi*M);
-//     return rho + M*(x*atan2(x) - log(1+pow(x,2))/2);
+    double x = (2*(abs(r) - a)) / (pi*M);
+    return rho + M*(x*atan(x) - log(1+pow(x,2))/2);
+}
 
-// }
+__device__ double dldr_dneg(double r, double a, double rho, double M)
+{
+    if (abs(r) < a) {
+        return 0.0;
+    }
+
+    double dldr = (2/pi)*atan(2*(abs(r)-a)/(pi*M));
+    if (r < 0) {
+        dldr *= -1;
+    }
+    return dldr;
+}
 
 __device__ double dldr(double r, double rhosq)
 {
     return r/l(r, rhosq) ;
 }
 
-__device__ State rhs(const State &s, double rhosq)
+__device__ State rhs(const State &s, double a, double rho, double M)
 {
 
     State ds;
-    double rsq = pow(l(s.r, rhosq), 2);
+    double rsq = pow(l_dneg(s.r, a, rho, M), 2);
 
     ds.r = s.pr;
     ds.theta = s.ptheta / rsq;
     ds.phi = s.b / (rsq*pow(sin(s.theta), 2));
-    ds.pr = s.Bsq*(dldr(s.r, rhosq) / (pow(l(s.r, rhosq), 3)));
+    ds.pr = s.Bsq*(dldr_dneg(s.r, a, rho, M) / (pow(l_dneg(s.r, a, rho, M), 3)));
     ds.ptheta = (pow(s.b, 2)/rsq) * cos(s.theta)/pow(sin(s.theta), 3);
     ds.b = 0.0;
     ds.Bsq = 0.0;
@@ -70,33 +82,33 @@ __device__ State rhs(const State &s, double rhosq)
     return ds;
 }
 
-__global__ void rk4_step(int N, State *states, double rhosq, double h)
+__global__ void rk4_step(int N, State *states, double a, double rho, double M, double h)
 {
     uint indx = blockIdx.x*blockDim.x + threadIdx.x;
 
     State s = states[indx];
     State y = s;
 
-    State k1 = rhs(s, rhosq);
+    State k1 = rhs(s, a, rho, M);
     s = state_add(y, state_mul(h/2, k1));
-    State k2 = rhs(s, rhosq);
+    State k2 = rhs(s, a, rho, M);
     s = state_add(y, state_mul(h/2, k2));
-    State k3 = rhs(s, rhosq);
+    State k3 = rhs(s, a, rho, M);
     s = state_add(y, state_mul(h, k3));
-    State k4 = rhs(s, rhosq);
+    State k4 = rhs(s, a, rho, M);
 
     s = state_add(y, state_mul(h/6, state_add(k4, state_add(state_mul(2.0, state_add(k2, k3)), k1))));
     states[indx] = s;
 }
 
-void curk4(int NA, int NB, int N, State *states, double rhosq, double h)
+void curk4(int NA, int NB, int N, State *states, double a, double rho, double M, double h)
 {
-    rk4_step<<<NA, NB>>>(N, states, rhosq, h);
+    rk4_step<<<NB, NA>>>(N, states, a, rho, M, h);
     cudaDeviceSynchronize();
 }
 
 
-int compute_wh(State *ics, int Nx, int Ny, double rhosq)
+int compute_wh(State *ics, int Nx, int Ny, double a, double rho, double M)
 {
     State *states_device;
     int N = Nx*Ny;
@@ -114,16 +126,22 @@ int compute_wh(State *ics, int Nx, int Ny, double rhosq)
     }
 
     int blockSize = 4096;
+    //int numBlocks = 512;
+    //blockSize = N / numBlocks;
     int numBlocks = N / blockSize;
+    numBlocks = 1;
+    blockSize = N;
+    blockSize = Nx;
+    numBlocks = (N/blockSize);
 
     // Integrate
     double dt = 1e-2;
     double t = 0.0;
-    double tend = 100.0;
+    double tend = 50.0;
     int k = 0;
     while(t < tend)
     {
-        curk4(blockSize, numBlocks, N, states_device, rhosq, dt);
+        curk4(blockSize, numBlocks, N, states_device, a, rho, M, dt);
         t += dt;
         k += 1;
 
