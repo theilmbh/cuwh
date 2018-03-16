@@ -12,41 +12,61 @@ using namespace cv;
 
 
 
-double r_l(double r, double rhosq)
+float r_l(float r, float rhosq)
 {
     return sqrt(rhosq + pow(r, 2));
 }
 
-double l_dneg_cpu(double r, double a, double rho, double M)
+float l_dneg_cpu(float r, float a, float rho, float M)
 {
     if (abs(r) < a) {
         return rho;
     }
 
-    double x = (2*(abs(r) - a)) / (pi*M);
+    float x = (2*(abs(r) - a)) / (pi*M);
     return rho + M*(x*atan(x) - log(1+pow(x,2))/2);
 }
 
-double cam_rot(double t)
+float cam_rot(float t)
 {
     //return pi/(1+exp(-4*(t - 0.5)));
     return pi/2;
 }
 
-void cam_trajectory(double *r, double *phi, double *theta, double t)
+void cam_trajectory(float *r, float *phi, float *theta, float t, float a, float b)
 {
-    double DR = 20;
-    double c = 4*DR/(2+sin(2));
-    double vphi = -2*pi;
-    *r = c*(t/2.0 + sin(2*t)/(4)) - 10;
-    *r = -0.01;
+    float DR = 20;
+    float c = 4*DR/(2+sin(2));
+    //float c = 20;
+    float V = 2.0/24; // km/frame (2 km/s)
+    float vphi = -2*pi;
+    //*r = c*(t/2.0 + sin(2*t)/(4)) - 10;
+    //*r = c*t - 10;
+
+    if (t < a)
+    {
+        *r = (10/a)*t - 10;
+    }
+    if (t > b)
+    {
+        *r = (10/(1-b))*t - (10*b)/(1-b);
+    }
+    if(t < b && t > a)
+    {
+        *r = 0;
+    }
+
+    *r = 20*tan(t-0.5);
+    *r = (20*pow(0.5, -3)*pow(t-0.5, 3));
+    //*r = -0.01;
+    //*phi = V*log(-10+c*t)/c;
     *phi = vphi*t;
     *theta = pi/2;
 }
 
-State * get_frame_ics(int Nx, int Ny, double thetaFOV, double phiFOV,
-                      double cam_l, double cam_phi, double cam_theta, 
-                      double t, double a, double rho, double M)
+State * get_frame_ics(int Nx, int Ny, float thetaFOV, float phiFOV,
+                      float cam_l, float cam_phi, float cam_theta, 
+                      float t, float a, float rho, float M)
 {
 
     int N = Nx*Ny;
@@ -55,26 +75,26 @@ State * get_frame_ics(int Nx, int Ny, double thetaFOV, double phiFOV,
     int i,j;
 
 
-    double mintheta = pi/2 - deg2rad*thetaFOV/2;
-    double maxtheta = pi/2 + deg2rad*thetaFOV/2;
-    double minphi = -deg2rad*phiFOV/2;
+    float mintheta = pi/2 - deg2rad*thetaFOV/2;
+    float maxtheta = pi/2 + deg2rad*thetaFOV/2;
+    float minphi = -deg2rad*phiFOV/2;
     minphi *= 1;
-    double maxphi = deg2rad*phiFOV/2;
+    float maxphi = deg2rad*phiFOV/2;
     maxphi *= 1;
-    double cam_r = l_dneg_cpu(cam_l, a, rho, M);
+    float cam_r = l_dneg_cpu(cam_l, a, rho, M);
 
-    double thetacs, phics;
-    double nx, ny, nz;
-    double phieps = 0.00001;
+    float thetacs, phics;
+    float nx, ny, nz;
+    float phieps = 0.00001;
 
-    double rot = cam_rot(t);
+    float rot = cam_rot(t);
 
     for(i=0; i<Nx; i++)  // phi
     {
         for(j=0; j<Ny; j++) // theta
         {
-            thetacs = mintheta + (((double) j)/Ny)*(maxtheta - mintheta);
-            phics = minphi + (((double) i)/Nx)*(maxphi - minphi) + phieps + rot;
+            thetacs = mintheta + (((float) j)/Ny)*(maxtheta - mintheta);
+            phics = minphi + (((float) i)/Nx)*(maxphi - minphi) + phieps + rot;
             nx = sin(thetacs)*cos(phics);
             ny = sin(thetacs)*sin(phics);
             nz = -1.0*cos(thetacs);
@@ -93,38 +113,50 @@ State * get_frame_ics(int Nx, int Ny, double thetaFOV, double phiFOV,
 
 }
 
-double remap_phi(double phi)
+float remap_phi(float phi)
 {
 
     // remap phi to [-pi, pi]
-    double sgn = 1.0;
-    if (phi < 0)
+
+    // compute mod 2pi
+    float r = phi - 2*pi*floor(phi/(2*pi));
+
+    if (r > pi)
     {
-        sgn = -1.0;
+        r -= 2*pi;
     }
-    while(abs(phi) >= 2*pi)
-    {
-        phi -= sgn*2*pi;
-    }
-    return phi;
+    return r;
+    // float sgn = 1.0;
+    // if (phi < 0)
+    // {
+    //     sgn = -1.0;
+    // }
+    // while(abs(phi) >= 2*pi)
+    // {
+    //     phi -= sgn*2*pi;
+    // }
+    // return phi;
 }
 
-double remap_theta(double theta)
+float remap_theta(float theta)
 {
     // remap theta to [0, pi]
-    double sgn = 1.0;
-    if (theta < 0)
-    {
-        sgn = -1.0;
-    }
-    while((theta >= pi) || (theta <=0))
-    {
-        theta -= sgn*pi;
-    }
-    return theta;
+
+    float r = theta - 2*pi*floor(theta/(2*pi));
+    return r;
+    // float sgn = 1.0;
+    // if (theta < 0)
+    // {
+    //     sgn = -1.0;
+    // }
+    // while((theta >= pi) || (theta <=0))
+    // {
+    //     theta -= sgn*pi;
+    // }
+    // return theta;
 }
 
-Vec3b bilinear_interpolate(const Mat& img, int pxf, int pyf, int pxc, int pyc, double px, double py)
+Vec3b bilinear_interpolate(const Mat& img, int pxf, int pyf, int pxc, int pyc, float px, float py)
 {
     Vec3b res;
     Vec3b y1 = (pxc - px)/(pxc - pxf) * img.at<Vec3b>(pyf, pxf) +
@@ -150,7 +182,7 @@ void map_image(int Nx, int Ny, State *res, int framenum)
 
     int pxf, pyf, pxc, pyc,
         x, y;
-    double phi, theta, s, px, py;
+    float phi, theta, s, px, py;
     Vec3b pix;
 
     //cout << "Mapping..." << endl;
@@ -204,37 +236,41 @@ int main(void)
     int N = Nx*Ny;  // total pixels in image.
 
     // Setup Initial conditions
-    double thetaFOV = 60;  // Vertical field of view
-    double phiFOV = thetaFOV*((double)Nx/(double)Ny);  // Keep aspect ratio
+    float thetaFOV = 60;  // Vertical field of view
+    float phiFOV = thetaFOV*((float)Nx/(float)Ny);  // Keep aspect ratio
     
 
-    double cam_l = -10.0;
-    double cam_phi = pi;
-    double cam_theta = pi/2;
-    double rhosq = pow(4.0, 2);
+    float cam_l = -10.0;
+    float cam_phi = pi;
+    float cam_theta = pi/2;
+    float rhosq = pow(4.0, 2);
 
-    int nframes = 120;
-    double dphi = 2*pi/nframes;
-    double dtheta = pi/12;
-    double t = 0;
+    int nframes = 15*24;
+    float dphi = 2*pi/nframes;
+    float dtheta = pi/12;
+    float t = 0;
 
     // Wormhole parameters
-    double rho = 4.0;
-    double a = 0.01*rho/2;
-    double W = 0.05*rho;
-    double M = W / 1.42953;
-    double dr = 0.5;
+    float rho = 4.0;
+    float a = 0.01*rho/2;
+    float W = 0.05*rho;
+    float M = W / 1.42953;
+    float dr = 0.5;
+
+    float a1 = 3./5.;
+    float b1 = 4./5.;
 
 
     State * states_host;
 
     for(int frame=0; frame<nframes; frame++)
     {
-        t = (double)frame/(double)nframes;
+        t = (float)frame/(float)nframes;
         // cam_phi += dphi;
         // cam_theta = pi/2 + dtheta*sin(2*pi*6*t);
         // cam_l += dr;
-        cam_trajectory(&cam_l, &cam_phi, &cam_theta, t);
+        cam_trajectory(&cam_l, &cam_phi, &cam_theta, t, a1, b1);
+        cout << t<< " " <<cam_l << " " << cam_phi << endl;
 
         states_host = get_frame_ics(Nx, Ny, thetaFOV, phiFOV, cam_l, cam_phi, cam_theta, t, a, rho, M);
         int err = compute_wh(states_host, Nx, Ny, a, rho, M);
