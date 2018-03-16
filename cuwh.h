@@ -18,7 +18,7 @@ State * get_frame_ics(int Nx, int Ny, float thetaFOV, float phiFOV,
                       float cam_l, float cam_phi, float cam_theta,
                       float a, float rho, float M);
 
-int compute_wh(State *ics, int Nx, int Ny, float a, float rho, float M);
+int compute_wh(int dev, State *ics, int Nx, int Ny, float a, float rho, float M);
 void curk4(int NA, int NB, int N, State *states, float a, float rho, float M, float h);
 
 

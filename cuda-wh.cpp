@@ -175,8 +175,8 @@ void map_image(int Nx, int Ny, State *res, int framenum)
     Mat cs1;
     Mat cs2;
 
-    cs1 = imread("/home/brad/wormhole/cuwh/saturn.jpeg", 1);
-    cs2 = imread("/home/brad/wormhole/cuwh/gargantua.jpeg", 1);
+    cs1 = imread("./saturn.jpeg", 1);
+    cs2 = imread("./gargantua.jpeg", 1);
 
     Mat out_image = Mat::zeros(Ny, Nx, cs1.type());
 
@@ -222,7 +222,7 @@ void map_image(int Nx, int Ny, State *res, int framenum)
     // waitKey();
     cout << "Writing image..." << endl;
     char fname[128];
-    sprintf(fname, "./frame%d.tiff", framenum);
+    sprintf(fname, "./imgs/frame%d.tiff", framenum);
     imwrite(fname, out_image);
 }
 
@@ -230,8 +230,8 @@ int main(void)
 {
 
 
-    int Nx = 320;
-    int Ny = 180;  // Pixes
+    int Nx = 1280;
+    int Ny = 720;  // Pixes
 
     int N = Nx*Ny;  // total pixels in image.
 
@@ -262,6 +262,7 @@ int main(void)
 
 
     State * states_host;
+    int dev = 3;
 
     for(int frame=0; frame<nframes; frame++)
     {
@@ -273,7 +274,7 @@ int main(void)
         cout << t<< " " <<cam_l << " " << cam_phi << endl;
 
         states_host = get_frame_ics(Nx, Ny, thetaFOV, phiFOV, cam_l, cam_phi, cam_theta, t, a, rho, M);
-        int err = compute_wh(states_host, Nx, Ny, a, rho, M);
+        int err = compute_wh(dev, states_host, Nx, Ny, a, rho, M);
         if (err < 0) {
             cout << "Computation Failed" << endl;
             return -1;

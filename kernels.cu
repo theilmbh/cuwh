@@ -108,9 +108,10 @@ void curk4(int NA, int NB, int N, State *states, float a, float rho, float M, fl
 }
 
 
-int compute_wh(State *ics, int Nx, int Ny, float a, float rho, float M)
+int compute_wh(int dev, State *ics, int Nx, int Ny, float a, float rho, float M)
 {
     State *states_device;
+    cudaSetDevice(dev);
     int N = Nx*Ny;
     cudaError_t err = cudaMalloc((void**) &states_device, N*sizeof(State));
 
@@ -131,7 +132,7 @@ int compute_wh(State *ics, int Nx, int Ny, float a, float rho, float M)
     int numBlocks = N / blockSize;
     numBlocks = 1;
     blockSize = N;
-    blockSize = Nx;
+    blockSize = Ny;
     numBlocks = (N/blockSize);
 
     // Integrate
