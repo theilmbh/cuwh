@@ -156,6 +156,17 @@ float remap_theta(float theta)
     // return theta;
 }
 
+void remap_phi_theta(float phi, float theta, float *phi2, float *theta2)
+{
+    float x = sin(theta)*cos(phi);
+    float y = sin(theta)*sin(phi);
+    float z = cos(theta);
+
+    *theta2 = acos(z)/pi;
+    *phi2 = atan2(y,x)/(2*pi);
+
+}
+
 Vec3b bilinear_interpolate(const Mat& img, int pxf, int pyf, int pxc, int pyc, float px, float py)
 {
     Vec3b res;
@@ -185,16 +196,12 @@ void map_image(int Nx, int Ny, State *res, int framenum)
     float phi, theta, s, px, py;
     Vec3b pix;
 
-    //cout << "Mapping..." << endl;
     for (x=0; x<Nx; x++)
     {
         for (y=0; y<Ny; y++)
         {
-            //cout << "x, y: " << x << y << endl;
-            //cout << res[x*Ny + y].phi << " " << res[x*Ny +y].theta << endl;
             phi = remap_phi(res[x*Ny + y].phi);
             theta = remap_theta(res[x*Ny +y].theta);
-            //cout << phi << " " << theta << endl;
             s = res[x*Ny+y].r / abs(res[x*Ny+y].r);
             px = (phi)/(2*pi) * cs1.cols;
             py = (theta/pi) * cs1.rows;
@@ -202,7 +209,6 @@ void map_image(int Nx, int Ny, State *res, int framenum)
             pyf = floor(py);
             pxc = ceil(px);
             pyc = ceil(py);
-            //cout << "interpolating" << endl;
             if (s < 0) {
                 pix = bilinear_interpolate(cs1, pxf, pyf, pxc, pyc, px, py);
             } else {
@@ -230,8 +236,8 @@ int main(void)
 {
 
 
-    int Nx = 1280;
-    int Ny = 720;  // Pixes
+    int Nx = 640;
+    int Ny = 360;  // Pixes
 
     int N = Nx*Ny;  // total pixels in image.
 
