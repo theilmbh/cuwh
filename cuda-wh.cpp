@@ -156,6 +156,17 @@ float remap_theta(float theta)
     // return theta;
 }
 
+void remap_phi_theta(float phi, float theta, float *phi2, float *theta2)
+{
+    float x = sin(theta)*cos(phi);
+    float y = sin(theta)*sin(phi);
+    float z = cos(theta);
+
+    *theta2 = acos(z)/pi;
+    *phi2 = atan2(y,x)/(2*pi);
+
+}
+
 Vec3b bilinear_interpolate(const Mat& img, int pxf, int pyf, int pxc, int pyc, float px, float py)
 {
     Vec3b res;
@@ -175,8 +186,8 @@ void map_image(int Nx, int Ny, State *res, int framenum)
     Mat cs1;
     Mat cs2;
 
-    cs1 = imread("/home/brad/wormhole/cuwh/saturn.jpeg", 1);
-    cs2 = imread("/home/brad/wormhole/cuwh/gargantua.jpeg", 1);
+    cs1 = imread("./saturn.jpeg", 1);
+    cs2 = imread("./gargantua.jpeg", 1);
 
     Mat out_image = Mat::zeros(Ny, Nx, cs1.type());
 
@@ -185,16 +196,12 @@ void map_image(int Nx, int Ny, State *res, int framenum)
     float phi, theta, s, px, py;
     Vec3b pix;
 
-    //cout << "Mapping..." << endl;
     for (x=0; x<Nx; x++)
     {
         for (y=0; y<Ny; y++)
         {
-            //cout << "x, y: " << x << y << endl;
-            //cout << res[x*Ny + y].phi << " " << res[x*Ny +y].theta << endl;
             phi = remap_phi(res[x*Ny + y].phi);
             theta = remap_theta(res[x*Ny +y].theta);
-            //cout << phi << " " << theta << endl;
             s = res[x*Ny+y].r / abs(res[x*Ny+y].r);
             px = (phi)/(2*pi) * cs1.cols;
             py = (theta/pi) * cs1.rows;
@@ -202,7 +209,6 @@ void map_image(int Nx, int Ny, State *res, int framenum)
             pyf = floor(py);
             pxc = ceil(px);
             pyc = ceil(py);
-            //cout << "interpolating" << endl;
             if (s < 0) {
                 pix = bilinear_interpolate(cs1, pxf, pyf, pxc, pyc, px, py);
             } else {
@@ -222,7 +228,7 @@ void map_image(int Nx, int Ny, State *res, int framenum)
     // waitKey();
     cout << "Writing image..." << endl;
     char fname[128];
-    sprintf(fname, "./frame%d.tiff", framenum);
+    sprintf(fname, "./imgs/frame%d.tiff", framenum);
     imwrite(fname, out_image);
 }
 
@@ -230,8 +236,8 @@ int main(void)
 {
 
 
-    int Nx = 320;
-    int Ny = 180;  // Pixes
+    int Nx = 640;
+    int Ny = 360;  // Pixes
 
     int N = Nx*Ny;  // total pixels in image.
 
@@ -262,6 +268,7 @@ int main(void)
 
 
     State * states_host;
+    int dev = 3;
 
     for(int frame=0; frame<nframes; frame++)
     {
@@ -273,7 +280,7 @@ int main(void)
         cout << t<< " " <<cam_l << " " << cam_phi << endl;
 
         states_host = get_frame_ics(Nx, Ny, thetaFOV, phiFOV, cam_l, cam_phi, cam_theta, t, a, rho, M);
-        int err = compute_wh(states_host, Nx, Ny, a, rho, M);
+        int err = compute_wh(dev, states_host, Nx, Ny, a, rho, M);
         if (err < 0) {
             cout << "Computation Failed" << endl;
             return -1;
